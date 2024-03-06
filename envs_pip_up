@@ -1,0 +1,78 @@
+#!/bin/bash
+
+if [ -z $1 ]; then
+    echo "Scanning the current directory for virtual environment(s)"
+    VENV_DIR=$(pwd)
+else
+    # Directory containing all your virtual environments
+    VENV_DIR=$1
+    # Iterate over each subdirectory (each virtual environment)
+    for venv in "$VENV_DIR"/*; do
+        if [ -d "$venv" ]; then
+            if [ -f "$venv/bin/activate" ]; then
+                echo "Updating $venv..."
+                # Activate the virtual environment
+                source "$venv/bin/activate"
+                # Upgrade all outdated packages
+                pipout=$(pip list -o | awk 'NR>2 {print $1}')
+                odt=($(awk -F= '{print $1}' <<<"$pipout"))
+                if [ -z "$odt" ]; then
+                    echo "No outdated package in $venv"
+                else
+                    for p in "${odt[@]}"; do
+                        if [[ "$p" == "torch" || "$p" == "torchaudio" || "$p" == "torchvision" ]]; then
+                            echo "PyTorch packages installed, please choose your compute platform:"
+                            echo "  0) Not upgrade"
+                            echo "  1) CPU"
+                            echo "  2) CUDA 12.1+"
+                            echo "  3) CUDA 11.8"
+                            while true; do
+                                read -p "your choice [default-0]: " choice
+                                choice=${choice:-0}
+                                if [[ $choice =~ ^[0-3]+$ ]]; then
+                                    break
+                                else
+                                    echo -e "\033[1A\033[K\033[1A"
+                                fi
+                            done
+                            plt=$((choice))
+                            case $plt in
+                                1) echo "Compute platform: CPU"
+                                ;;
+                                2) echo "Compute platform: CUDA 12.1+"
+                                ;;
+                                3) echo "Compute platform: CUDA 11.8"
+                                ;;
+                                *) echo "Not upgrading PyTorch packages."
+                                ;;
+                            esac
+                            break
+                        fi
+                    done
+                    for pkg in "${odt[@]}"; do
+                        if [[ "$pkg" == "torch" || "$pkg" == "torchaudio" || "$pkg" == "torchvision" ]]; then
+                            case $plt in
+                                1) pip install --index-url https://download.pytorch.org/whl/cpu --upgrade $pkg
+                                ;;
+                                2) pip install --upgrade $pkg
+                                ;;
+                                3) pip install --index-url https://download.pytorch.org/whl/cu118 --upgrade $pkg
+                                ;;
+                                *) echo "Skip upgrading $pkg package."
+                                ;;
+                            esac
+                        else
+                            pip install --upgrade $pkg
+                        fi
+                    done
+                fi
+                # Deactivate the virtual environment
+                deactivate
+            else
+                echo "$venv is not a virtual environment."
+            fi
+        fi
+    done
+    echo "All virtual environments updated!"
+fi
+exit 0
