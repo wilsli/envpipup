@@ -5,7 +5,7 @@ else
     # Directory containing all your virtual environments
     VENV_DIR=$1
 fi
-echo "Scan $VENV_DIR"
+echo "Working in $VENV_DIR"
 # Iterate over each subdirectory (each virtual environment)
 for venv in "$VENV_DIR"/*; do
     if [ -d "$venv" ]; then
@@ -13,6 +13,7 @@ for venv in "$VENV_DIR"/*; do
             echo "Updating $venv..."
             # Activate the virtual environment
             source "$venv/bin/activate"
+            echo "Virtual environment activated.Current Python version: $(python --version)"
             # Upgrade all outdated packages
             pipout=$(pip list -o | awk 'NR>2 {print $1}')
             odt=($(awk -F= '{print $1}' <<<"$pipout"))
@@ -68,10 +69,11 @@ for venv in "$VENV_DIR"/*; do
             fi
             # Deactivate the virtual environment
             deactivate
+            echo "Virtual environment deactivated."
         else
             echo "$venv is not a virtual environment."
         fi
     fi
 done
-echo "All virtual environments updated."
+echo "All found virtual environment(s) updated."
 exit 0
