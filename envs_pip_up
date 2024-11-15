@@ -1,4 +1,27 @@
 #!/bin/bash
+
+# Help message
+if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
+    echo "Usage: $(basename "$0") [directory]"
+    echo "Upgrade all outdated packages in Python virtual environments"
+    echo ""
+    echo "Arguments:"
+    echo "  directory    Path to directory containing virtual environments"
+    echo "              If not provided, uses current directory"
+    echo ""
+    echo "Options:"
+    echo "  -h, --help  Show this help message and exit"
+    exit 0
+fi
+
+# Version information
+if [ "$1" == "-V" ] || [ "$1" == "--version" ]; then
+    echo "envs_pip_up version 1.0.3"
+    echo "A tool to upgrade all outdated packages in Python virtual environments"
+    exit 0
+fi
+
+# Upgrade all outdated packages in all virtual environments
 if [ -z $1 ]; then
     VENV_DIR=$(pwd)
 else
