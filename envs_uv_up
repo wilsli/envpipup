@@ -1,0 +1,102 @@
+#!/bin/bash
+
+# Help message
+if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
+    echo "Usage: $(basename "$0") [directory]"
+    echo "Upgrade all outdated packages in UV managed Python virtual environments"
+    echo ""
+    echo "Arguments:"
+    echo "  directory    Path to directory containing virtual environments"
+    echo "              If not provided, uses current directory"
+    echo ""
+    echo "Options:"
+    echo "  -h, --help  Show this help message and exit"
+    exit 0
+fi
+
+# Version information
+if [ "$1" == "-V" ] || [ "$1" == "--version" ]; then
+    echo "envs_uv_up version 1.0.0"
+    echo "A tool to upgrade all outdated packages in UV managed Python virtual environments"
+    exit 0
+fi
+
+# Upgrade all outdated packages in all virtual environments
+if [ -z $1 ]; then
+    VENV_DIR=$(pwd)
+else
+    # Directory containing all your virtual environments
+    VENV_DIR=$1
+fi
+echo "Working in $VENV_DIR"
+# Iterate over each subdirectory (each virtual environment)
+for venv in "$VENV_DIR"/*; do
+    if [ -d "$venv" ]; then
+        if [ -f "$venv/bin/activate" ]; then
+            echo "Updating $venv..."
+            # Activate the virtual environment
+            source "$venv/bin/activate"
+            echo "Virtual environment activated.Current Python version: $(python --version)"
+            # Upgrade all outdated packages
+            pipout=$(uv pip list --outdated | awk 'NR>2 {print $1}')
+            odt=($(awk -F= '{print $1}' <<<"$pipout"))
+            if [ -z "$odt" ]; then
+                echo "No outdated package in $venv"
+            else
+                for p in "${odt[@]}"; do
+                    if [[ "$p" == "torch" || "$p" == "torchaudio" || "$p" == "torchvision" ]]; then
+                        echo "PyTorch packages installed, please choose your compute platform:"
+                        echo "  0) Not upgrade"
+                        echo "  1) CPU"
+                        echo "  2) CUDA 12.1+"
+                        echo "  3) CUDA 11.8"
+                        while true; do
+                            read -p "your choice [default-0]: " choice
+                            choice=${choice:-0}
+                            if [[ $choice =~ ^[0-3]+$ ]]; then
+                                break
+                            else
+                                echo -e "\033[1A\033[K\033[1A"
+                            fi
+                        done
+                        plt=$((choice))
+                        case $plt in
+                            1) echo "Compute platform: CPU"
+                            ;;
+                            2) echo "Compute platform: CUDA 12.1+"
+                            ;;
+                            3) echo "Compute platform: CUDA 11.8"
+                            ;;
+                            *) echo "Not upgrading PyTorch packages."
+                            ;;
+                        esac
+                        break
+                    fi
+                done
+                for pkg in "${odt[@]}"; do
+                    if [[ "$pkg" == "torch" || "$pkg" == "torchaudio" || "$pkg" == "torchvision" ]]; then
+                        case $plt in
+                            1) uv pip install --index-url https://download.pytorch.org/whl/cpu --upgrade $pkg
+                            ;;
+                            2) uv pip install --upgrade $pkg
+                            ;;
+                            3) uv pip install --index-url https://download.pytorch.org/whl/cu118 --upgrade $pkg
+                            ;;
+                            *) echo "Skip upgrading $pkg package."
+                            ;;
+                        esac
+                    else
+                        uv pip install --upgrade $pkg
+                    fi
+                done
+            fi
+            # Deactivate the virtual environment
+            deactivate
+            echo "Virtual environment deactivated."
+        else
+            echo "$venv is not a virtual environment."
+        fi
+    fi
+done
+echo "All found virtual environment(s) updated."
+exit 0
